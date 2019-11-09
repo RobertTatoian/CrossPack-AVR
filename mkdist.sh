@@ -6,16 +6,27 @@
 #  Created by Christian Starkjohann on 2012-11-28.
 #  Copyright (c) 2012 Objective Development Software GmbH.
 
+# Package name and version number
 pkgUnixName=CrossPack-AVR
 pkgPrettyName="CrossPack for AVR Development"
 pkgUrlName=crosspack    # name used for http://www.obdev.at/$pkgUrlName
 pkgVersion=20170210
 
-# Build dependencies
+# Core build dependencies
+# Versions current as of 11/09/19
+version_binutils=2.33.1
+version_gcc=9.2.0
+version_avrlibc=2.0.0
+
+# Optional build dependencies
+version_avrdude=6.3
+version_gdb=8.3.1
+version_avarice=2.13
+version_simulavr=1.0.0
+
+# Other build dependencies
 version_automake=1.15
 version_autoconf=2.68
-
-version_gdb=7.12
 version_gmp=6.1.2
 version_mpfr=3.1.2
 version_mpc=1.0
@@ -23,30 +34,22 @@ version_ppl=0.12.1
 version_cloog=0.16.2
 version_libusb=1.0.21
 version_libusb_compat=0.1.5
-version_avarice=2.13
-version_avrdude=6.3
-version_simulavr=0.1.2.7
-# simulavr-1.0.0 does not compile
-# We want to add simavr to the distribution, but it does not compile easily...
-
-# The following packages are fetched from Atmel:
-atmelToolchainVersion=3.5.4
-version_binutils=2.26.20160125
-version_gcc=4.9.2
-#version_gcc3=3.4.6
-#version_headers=???
-version_avrlibc=2.0.0
 
 debug=false
+debugPackageDownload=false
 if [ "$1" = debug ]; then
     debug=true
+elif ["$1" = debugPackageDownload]; then
+	debugPackageDownload=true
 fi
 
+# Set the path to the installation directory.
 prefix="/usr/local/$pkgUnixName-$pkgVersion"
 configureArgs="--disable-dependency-tracking --disable-nls --disable-werror"
 
 umask 0022
 
+# Set the path to the macOS SDK.
 xcodepath="$(xcode-select -print-path)"
 sysroot="$xcodepath/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
@@ -54,10 +57,13 @@ sysroot="$xcodepath/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 PATH="$prefix/bin:$xcodepath/usr/bin:$xcodepath/Toolchains/XcodeDefault.xctoolchain/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
 
+# Commonly used flags when building various tools.
 commonCFLAGS="-isysroot $sysroot -mmacosx-version-min=10.6"
+
 # Build libraries for i386 and x86_64, but executables i386 only so that the
 # size of the distribution is not unecessary large.
 buildCFLAGS="$commonCFLAGS -arch i386 -fno-stack-protector"  # used for tool chain
+
 # Why -fno-stack-protector? Gcc 4.7.2 compiled with Xcode 5 aborts with a stack
 # protection failure when building libgcc for avrtiny. The problem occurs with -O2
 # only, not with -O0. It's hard to debug with the heavy inlining of -O2. Since
@@ -70,6 +76,7 @@ buildCFLAGS="$commonCFLAGS -arch i386 -fno-stack-protector"  # used for tool cha
 # Check prerequisites first
 ###############################################################################
 
+# Check that the release notes have been updated, if this is a release build.
 releaseNotesVersion=$(sed -n -e '/20[01234][0-9][01][0-9][0-3][0-9]<[/]h/ s/^.*\([0-9]\{8\}\).*$/\1/g p' manual-source/releasenotes.html | head -1)
 if ! $debug; then
     if [ "$releaseNotesVersion" != "$pkgVersion" ]; then
@@ -86,20 +93,27 @@ fi
 # download a package and unpack it
 getPackage() # <url> <alwaysDownload> <package-name>
 {
+	# Set the URL and use basename to get the filename of the package.
     url="$1"
     package=$(basename "$url")
+    
+    # No idea what this does
     [ "$3" ] && package="$3"
+    
+    # Check if we want to download the package.
     doDownload=no
     if [ ! -f "packages/$package" ]; then
-        doDownload=yes      # not yet downloaded
+        doDownload=yes		# not yet downloaded.
     elif ! $debug; then
         if [ "$2" = alwaysDownload ]; then
-            doDownload=yes  # release build and download forced
+            doDownload=yes	# release build and download forced.
         fi
     fi
+	
+	# Download the package if we need to.
     if [ "$doDownload" = yes ]; then
         echo "=== Downloading package $package"
-        rm -f "packages/$package"
+        rm -f "packages/$package"	# Clean out any existing package.
         curl --location --progress-bar -o "packages/$package" "$url"
         if [ $? -ne 0 ] || file "packages/$package" | grep -q HTML; then
             echo "################################################################################"
@@ -431,7 +445,7 @@ fixLoadCommandInBinary() #<binary-path> <searchLibraryPath> <replacementLibraryP
 }
 
 ###############################################################################
-# main code
+# Main Code
 ###############################################################################
 
 if [ -d "$prefix" -a ! -w "$prefix" -a -x "$prefix/uninstall" ]; then
@@ -442,45 +456,77 @@ if [ -d "$prefix" -a ! -w "$prefix" -a -x "$prefix/uninstall" ]; then
     fi
 fi
 
+# If we're in release, clean up these directories before continuing.
 if ! "$debug"; then
     rm -rf "$installdir"
     rm -rf compile
     rm -rf "$prefix"
 fi
 
+# Create the package directory if not there.
 if [ ! -d packages ]; then
     mkdir packages
 fi
 
-echo "Starting download at $(date +"%Y-%m-%d %H:%M:%S")"
+echo "*═════════════════════════════════════*"
+echo "║Starting download at:                ║"
+echo "║$(date +"%Y-%m-%d %H:%M:%S")		     "
+echo "*═════════════════════════════════════*░░"
+echo "  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
+echo "  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
 
-atmelBaseURL="http://distribute.atmel.no/tools/opensource/Atmel-AVR-GNU-Toolchain/$atmelToolchainVersion"
-# always download packages from Atmel, they sometimes update patches without updating the package name
-getPackage "$atmelBaseURL/avr-binutils.tar.bz2" alwaysDownload "avr-binutils-$version_binutils.tar.bz2"
-getPackage "$atmelBaseURL/avr-gcc.tar.bz2" alwaysDownload "avr-gcc-$version_gcc.tar.bz2"
-getPackage "$atmelBaseURL/avr8-headers.zip" alwaysDownload
-getPackage "$atmelBaseURL/avr-libc.tar.bz2" alwaysDownload "avr-libc-$version_avrlibc.tar.bz2"
+# Some of thes URLs are out of date, others are not included in the toolchain build instructions
+# given here: https://www.microchip.com/webdoc/AVRLibcReferenceManual/install_tools.html. Most of the
+# packages required are the same, however several either don't exist, have moved to another site, are not mentioned
+# on Microchip's site, etc..
+# I'll comment these out for now until I have time to look at them later.
+
+#atmelBaseURL="http://distribute.atmel.no/tools/opensource/Atmel-AVR-GNU-Toolchain/$atmelToolchainVersion"
+## always download packages from Atmel, they sometimes update patches without updating the package name
+#getPackage "$atmelBaseURL/avr-binutils.tar.bz2" alwaysDownload "avr-binutils-$version_binutils.tar.bz2"
+#getPackage "$atmelBaseURL/avr-gcc.tar.bz2" alwaysDownload "avr-gcc-$version_gcc.tar.bz2"
+#getPackage "$atmelBaseURL/avr8-headers.zip" alwaysDownload
+#getPackage "$atmelBaseURL/avr-libc.tar.bz2" alwaysDownload "avr-libc-$version_avrlibc.tar.bz2"
 # We do not fetch patches available in this directory because they are already applied
-
+#
 #getPackage http://ftp.sunet.se/pub/gnu/gcc/releases/gcc-"$version_gcc3"/gcc-"$version_gcc3".tar.bz2
-
-getPackage https://ftp.gnu.org/gnu/automake/automake-"$version_automake".tar.gz
-getPackage https://gmplib.org/download/gmp/gmp-"$version_gmp".tar.bz2
-getPackage https://ftp.gnu.org/gnu/mpfr/mpfr-"$version_mpfr".tar.bz2
-getPackage http://www.multiprecision.org/mpc/download/mpc-"$version_mpc".tar.gz
+#
+#getPackage https://ftp.gnu.org/gnu/automake/automake-"$version_automake".tar.gz
+#getPackage https://gmplib.org/download/gmp/gmp-"$version_gmp".tar.bz2
+#getPackage https://ftp.gnu.org/gnu/mpfr/mpfr-"$version_mpfr".tar.bz2
+#getPackage http://www.multiprecision.org/mpc/download/mpc-"$version_mpc".tar.gz
 # We would like to compile with cloog, but linking 32 bit C++ code fails with clang.
 #getPackage http://bugseng.com/products/ppl/download/ftp/releases/"$version_ppl"/ppl-"$version_ppl".tar.bz2
 #getPackage http://gcc.cybermirror.org/infrastructure/cloog-"$version_cloog".tar.gz
-getPackage https://ftp.gnu.org/gnu/autoconf/autoconf-"$version_autoconf".tar.gz
-getPackage https://ftp.gnu.org/gnu/gdb/gdb-"$version_gdb".tar.gz
-getPackage http://downloads.sourceforge.net/avarice/avarice-"$version_avarice".tar.bz2
-getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-manpages-"$version_avrlibc".tar.bz2
-getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-user-manual-"$version_avrlibc".tar.bz2
-getPackage http://downloads.sourceforge.net/project/libusb/libusb-1.0/libusb-"$version_libusb"/libusb-"$version_libusb".tar.bz2
-getPackage http://downloads.sourceforge.net/project/libusb/libusb-compat-0.1/libusb-compat-"$version_libusb_compat"/libusb-compat-"$version_libusb_compat".tar.bz2
-getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-"$version_avrdude".tar.gz
-getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-doc-"$version_avrdude".tar.gz
-getPackage https://download.savannah.gnu.org/releases/simulavr/simulavr-"$version_simulavr".tar.gz
+#getPackage https://ftp.gnu.org/gnu/autoconf/autoconf-"$version_autoconf".tar.gz
+#getPackage https://ftp.gnu.org/gnu/gdb/gdb-"$version_gdb".tar.gz
+#getPackage http://downloads.sourceforge.net/avarice/avarice-"$version_avarice".tar.bz2
+#getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-manpages-"$version_avrlibc".tar.bz2
+#getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-user-manual-"$version_avrlibc".tar.bz2
+#getPackage http://downloads.sourceforge.net/project/libusb/libusb-1.0/libusb-"$version_libusb"/libusb-"$version_libusb".tar.bz2
+#getPackage http://downloads.sourceforge.net/project/libusb/libusb-compat-0.1/libusb-compat-"$version_libusb_compat"/libusb-compat-"$version_libusb_compat".tar.bz2
+#getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-"$version_avrdude".tar.gz
+#getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-doc-"$version_avrdude".tar.gz
+#getPackage https://download.savannah.gnu.org/releases/simulavr/simulavr-"$version_simulavr".tar.gz
+
+gnuBaseURL="https://ftp.gnu.org/gnu"
+savannahBaseURL="http://download.savannah.gnu.org/releases"
+sourceforgeBaseURL="https://sourceforge.net/projects/"
+
+# The core tools required are binutils, GCC, and AVR LibC.
+getPackage "$gnuBaseURL/binutils/binutils-$version_binutils.tar.xz"
+getPackage "$gnuBaseURL/gcc/gcc-$version_gcc/gcc-$version_gcc.tar.gz"
+getPackage "$savannahBaseURL/avr-libc/avr-libc-$version_avrlibc.tar.bz2"
+
+# Optional tools are AVRDUDE, GDB, SimulAVR, and AVaRICE.
+getPackage "$savannahBaseURL/avrdude/avrdude-$version_avrdude.tar.gz"
+getPackage "$gnuBaseURL/gdb/gdb-$version_gdb.tar.xz"
+getPackage "$savannahBaseURL/simulavr/simulavr-$version_simulavr.tar.gz"
+getPackage "$sourceforgeBaseURL/avarice/files/avarice/avarice-$version_avarice/avarice-$version_avarice.tar.bz2"
+
+if [ debugPackageDownload ]; then
+	exit 0
+fi
 
 installdir="$(pwd)/temporary-install"
 if [ ! -d "$installdir" ]; then
