@@ -8,11 +8,14 @@ all required packages, compiles them, builds an installer package and wraps
 it into a disk image, ready for distribution. It also contains resources such
 as a project template, manual etc.
 
+The repository maintained by obdev seems to be dead, so this repository aims to
+update the shell script to work on macOS 10.15.
 
 PREREQUISITES
 =============
 
-* Xcode 5. It probably also works with Xcode 4.4 and newer versions of Xcode.
+* Xcode 5 or newer versions.
+* Mac OS 10.9 or later.
 
 
 BUILDING CROSSPACK-AVR
