@@ -60,8 +60,9 @@ version_automake=1.15
 version_autoconf=2.68
 version_ppl=0.12.1
 version_cloog=0.16.2
-version_libusb=1.0.21
-version_libusb_compat=0.1.5
+version_libusb=1.0.23
+version_swig=1.3.40		# The latest version is: 4.0.1, but simulavr requires 1.3.xx.
+
 
 debug=false
 if [ "$1" = debug ]; then
@@ -79,7 +80,7 @@ xcodepath="$(xcode-select -print-path)"
 sysroot="$xcodepath/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
 # Do not include original PATH in our PATH to ensure that third party stuff is not found
-PATH="$prefix/bin:$xcodepath/usr/bin:$xcodepath/Toolchains/XcodeDefault.xctoolchain/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+PATH="$prefix/bin:$xcodepath/usr/bin:$xcodepath/Toolchains/XcodeDefault.xctoolchain/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"
 export PATH
 
 # Commonly used flags when building various tools.
@@ -453,6 +454,12 @@ buildPackage()
 #            fi
 #        fi
         
+        if [ "$name" = "libusb-compat-0.1" ]; then
+			echo $PATH
+			echo "Current package is libusb-compat-0.1, execute autogen.sh"
+			./autogen.sh
+        fi
+        
         if [ "$base" = gcc ]; then
             # manually clean dependent files, these are not always removed by make distclean
             grep -RiIn --exclude-dir zlib 'generated automatically by' . | tr ':' ' ' | while read file line rest; do
@@ -519,6 +526,11 @@ buildPackage()
                 echo "$base: $version" >"$prefix/etc/versions.d/$base"
                 ;;
         esac
+        
+		echo "*═══════════════════════════════════════════════════════*"
+		echo "║Finished installing $name at $(date +"%Y-%m-%d %H:%M:%S")"
+		echo "*═══════════════════════════════════════════════════════*"
+		
     )
     checkreturn
 }
@@ -602,60 +614,45 @@ echo "*════════════════════════�
 echo "║Starting downloads at: $(date +"%Y-%m-%d %H:%M:%S")"
 echo "*═══════════════════════════════════════════════════════*"
 
-# Some of thes URLs are out of date, others are not included in the toolchain build instructions
-# given here: https://www.microchip.com/webdoc/AVRLibcReferenceManual/install_tools.html. Most of the
-# packages required are the same, however several either don't exist, have moved to another site, are not mentioned
-# on Microchip's site, etc..
-# I'll comment these out for now until I have time to look at them later.
-
-#atmelBaseURL="http://distribute.atmel.no/tools/opensource/Atmel-AVR-GNU-Toolchain/$atmelToolchainVersion"
-## always download packages from Atmel, they sometimes update patches without updating the package name
-#getPackage "$atmelBaseURL/avr-binutils.tar.bz2" alwaysDownload "avr-binutils-$version_binutils.tar.bz2"
-#getPackage "$atmelBaseURL/avr-gcc.tar.bz2" alwaysDownload "avr-gcc-$version_gcc.tar.bz2"
-#getPackage "$atmelBaseURL/avr8-headers.zip" alwaysDownload
-#getPackage "$atmelBaseURL/avr-libc.tar.bz2" alwaysDownload "avr-libc-$version_avrlibc.tar.bz2"
-# We do not fetch patches available in this directory because they are already applied
-#
-#getPackage http://ftp.sunet.se/pub/gnu/gcc/releases/gcc-"$version_gcc3"/gcc-"$version_gcc3".tar.bz2
-#
 #getPackage https://ftp.gnu.org/gnu/automake/automake-"$version_automake".tar.gz
-#getPackage https://gmplib.org/download/gmp/gmp-"$version_gmp".tar.bz2
-#getPackage https://ftp.gnu.org/gnu/mpfr/mpfr-"$version_mpfr".tar.bz2
-#getPackage http://www.multiprecision.org/mpc/download/mpc-"$version_mpc".tar.gz
-# We would like to compile with cloog, but linking 32 bit C++ code fails with clang.
-#getPackage http://bugseng.com/products/ppl/download/ftp/releases/"$version_ppl"/ppl-"$version_ppl".tar.bz2
-#getPackage http://gcc.cybermirror.org/infrastructure/cloog-"$version_cloog".tar.gz
 #getPackage https://ftp.gnu.org/gnu/autoconf/autoconf-"$version_autoconf".tar.gz
-#getPackage https://ftp.gnu.org/gnu/gdb/gdb-"$version_gdb".tar.gz
-#getPackage http://downloads.sourceforge.net/avarice/avarice-"$version_avarice".tar.bz2
-#getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-manpages-"$version_avrlibc".tar.bz2
-#getPackage https://download.savannah.gnu.org/releases/avr-libc/avr-libc-user-manual-"$version_avrlibc".tar.bz2
-#getPackage http://downloads.sourceforge.net/project/libusb/libusb-1.0/libusb-"$version_libusb"/libusb-"$version_libusb".tar.bz2
-#getPackage http://downloads.sourceforge.net/project/libusb/libusb-compat-0.1/libusb-compat-"$version_libusb_compat"/libusb-compat-"$version_libusb_compat".tar.bz2
-#getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-"$version_avrdude".tar.gz
-#getPackage https://download.savannah.gnu.org/releases/avrdude/avrdude-doc-"$version_avrdude".tar.gz
-#getPackage https://download.savannah.gnu.org/releases/simulavr/simulavr-"$version_simulavr".tar.gz
 
+#getPackage http://downloads.sourceforge.net/project/libusb/libusb-compat-0.1/libusb-compat-"$version_libusb_compat"/libusb-compat-"$version_libusb_compat".tar.bz2
+
+# Commonly used URLs
 gnuBaseURL="https://ftp.gnu.org/gnu"
 savannahBaseURL="http://download.savannah.gnu.org/releases"
-sourceforgeBaseURL="https://sourceforge.net/projects/"
+sourceforgeBaseURL="https://sourceforge.net/projects"
 
+# MARK: Core Tools.
 # The core tools required are binutils, GCC, and AVR LibC.
 getPackage "$gnuBaseURL/binutils/binutils-$version_binutils.tar.xz"
 getPackage "$gnuBaseURL/gcc/gcc-$version_gcc/gcc-$version_gcc.tar.gz"
 getPackage "$savannahBaseURL/avr-libc/avr-libc-$version_avrlibc.tar.bz2"
 
+# MARK: GCC Dependencies
 # Required to build the GCC
 getPackage "$gnuBaseURL/gmp/gmp-$version_gmp.tar.xz"
 getPackage "$gnuBaseURL/mpc/mpc-$version_mpc.tar.gz"
 getPackage "$gnuBaseURL/mpfr/mpfr-$version_mpfr.tar.gz"
 
+# MARK: Optional Tools
 # Optional tools are AVRDUDE, GDB, SimulAVR, and AVaRICE.
 getPackage "$savannahBaseURL/avrdude/avrdude-$version_avrdude.tar.gz"
 getPackage "$gnuBaseURL/gdb/gdb-$version_gdb.tar.xz"
 getPackage "$savannahBaseURL/simulavr/simulavr-$version_simulavr.tar.gz"
 getPackage "$sourceforgeBaseURL/avarice/files/avarice/avarice-$version_avarice/avarice-$version_avarice.tar.bz2"
 
+# MARK: Other dependencies
+# Other dependencies
+getPackage "https://github.com/libusb/libusb/releases/download/v$version_libusb/libusb-$version_libusb.tar.bz2"
+getPackage "https://github.com/libusb/libusb-compat-0.1/archive/master.zip"
+getPackage "$sourceforgeBaseURL/swig/files/swig/swig-$version_swig/swig-$version_swig.tar.gz"
+
+# MARK: Documentation
+getPackage "$savannahBaseURL/avrdude/avrdude-doc-$version_avrdude.tar.gz"
+getPackage "$savannahBaseURL/avr-libc/avr-libc-manpages-$version_avrlibc.tar.bz2"
+getPackage "$savannahBaseURL/avr-libc/avr-libc-user-manual-$version_avrlibc.tar.bz2"
 
 echo "*═══════════════════════════════════════════════════════*"
 echo "║Finished downloads at: $(date +"%Y-%m-%d %H:%M:%S")"
@@ -666,6 +663,10 @@ if [ ! -d "$installdir" ]; then
     mkdir "$installdir"
 fi
 
+# Rename libusb-compat
+if [ -f "$(pwd)/packages/master.zip" ]; then
+	mv "$(pwd)/packages/master.zip" "$(pwd)/packages/libusb-compat-0.1.zip"
+fi
 
 #########################################################################
 # Build sources
@@ -700,28 +701,25 @@ rm -f "$installdir/lib/"*.dylib # ensure we have no shared libs
 
 #########################################################################
 # additional goodies
+# MARK: Build libusb
 #########################################################################
-#(
-#    for arch in i386 x86_64; do
-#        buildCFLAGS="$commonCFLAGS -arch $arch"
-#        buildPackage libusb-"$version_libusb" "$prefix/lib/libusb-1.0.a" --disable-shared
-#        export LIBUSB_1_0_CFLAGS="-I$prefix/include/libusb-1.0"
-#        export LIBUSB_1_0_LIBS="-lusb"
-#        buildPackage libusb-compat-"$version_libusb_compat" "$prefix/lib/libusb.a" --disable-shared
-#        rm -f "$prefix/lib"/libusb*.dylib
-#        for file in "$prefix/lib"/libusb*.a; do
-#            if [ "$file" != "$prefix/lib/libusb*.a" ]; then
-#                lipoHelper rename "$file"
-#            fi
-#        done
-#    done
-#    for file in "$prefix/lib"/libusb*.a.i386; do
-#        if [ "$file" != "$prefix/lib/libusb*.a.i386" ]; then
-#            lipoHelper merge "$file"
-#        fi
-#    done
-#)
-#checkreturn
+(
+	buildCFLAGS="$commonCFLAGS -arch x86_64"
+	buildPackage libusb-"$version_libusb" "$prefix/lib/libusb-1.0.a" --disable-shared
+	
+	export LIBUSB_1_0_CFLAGS="-I$prefix/include/libusb-1.0"
+	export LIBUSB_1_0_LIBS="-lusb"
+	buildPackage libusb-compat-0.1 "$prefix/lib/libusb.a" --disable-shared
+	
+	rm -f "$prefix/lib"/libusb*.dylib
+	
+	for file in "$prefix/lib"/libusb*.a; do
+		if [ "$file" != "$prefix/lib"/libusb*.a ]; then
+			lipoHelper rename "$file"
+		fi
+	done
+)
+checkreturn
 
 #########################################################################
 # binutils and prerequisites
@@ -734,8 +732,10 @@ if [ ! -f "$prefix/bfd/lib/libbfd.a" ]; then
     mkdir "$prefix/bfd/lib"
     cp compile/binutils-"$version_binutils"/bfd/libbfd.a "$prefix/bfd/lib/"
     cp compile/binutils-"$version_binutils"/bfd/bfd.h "$prefix/bfd/include/"
+    cp compile/binutils-"$version_binutils"/bfd/bfd_stdint.h "$prefix/bfd/include/"
     cp compile/binutils-"$version_binutils"/include/ansidecl.h "$prefix/bfd/include/"
     cp compile/binutils-"$version_binutils"/include/symcat.h "$prefix/bfd/include/"
+    cp compile/binutils-"$version_binutils"/include/diagnostics.h "$prefix/bfd/include/"
 fi
 
 if [ ! -f "$prefix/lib/libiberty.a" ]; then
@@ -753,24 +753,30 @@ buildPackage gcc-"$version_gcc" "$prefix/bin/avr-gcc" --target=avr --enable-lang
 # avr-libc
 # MARK: Build AVR-LibC
 #########################################################################
-unpackPackage "avr8-headers"
+#unpackPackage "avr8-headers"
 buildPackage avr-libc-"$version_avrlibc" "$prefix/avr/lib/libc.a" --host=avr --enable-device-lib
 copyPackage avr-libc-user-manual-"$version_avrlibc" "$prefix/doc/avr-libc"
 copyPackage avr-libc-manpages-"$version_avrlibc" "$prefix/man"
 
 #########################################################################
 # avr-gcc full build
-# MARK: Build GCC with C & C++ Support
+# MARK: GCC with C & C++ Support
 #########################################################################
-buildPackage avr-gcc-"$version_gcc" "$prefix/bin/avr-g++" --target=avr --enable-languages=c,c++ --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
+buildPackage gcc-"$version_gcc" "$prefix/bin/avr-g++" --target=avr --enable-languages=c,c++ --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
+
 
 #########################################################################
 # GDB
 # MARK: Build GDB
 #########################################################################
 buildPackage gdb-"$version_gdb" "$prefix/bin/avr-gdb" --target=avr --without-python
+
+#########################################################################
+# AVaRICE
+# MARK: Build AVaRICE
+#########################################################################
 (
-    binutils="$(pwd)/compile/avr-binutils-$version_binutils"
+    binutils="$(pwd)/compile/binutils-$version_binutils"
     buildCFLAGS="$buildCFLAGS $("$prefix/bin/libusb-config" --cflags) -I$binutils/bfd -I$binutils/include -O"
     export LDFLAGS="$LDFLAGS $("$prefix/bin/libusb-config" --libs) -L$binutils/bfd -lz -L$binutils/libiberty -liberty"
     buildPackage avarice-"$version_avarice" "$prefix/bin/avarice"
@@ -780,12 +786,13 @@ checkreturn
 #########################################################################
 # SimulAVR
 # MARK: Build SimulAVR
+# FIXME: SimulAVR 1.0.0 does not build. Commenting out for now, will revisit at a later point.
 #########################################################################
-(
-    export CFLAGS="-Wno-error -g -O2"
-    buildPackage simulavr-"$version_simulavr" "$prefix/bin/simulavr" --with-bfd="$prefix/bfd" --with-libiberty="$prefix" --disable-static --enable-dependency-tracking
-)
-checkreturn
+#(
+#    export CFLAGS="-Wno-error -g -O2"
+#    buildPackage simulavr-"$version_simulavr" "$prefix/bin/simulavr" --with-bfd="$prefix/bfd" --with-libiberty="$prefix" --disable-static --enable-dependency-tracking
+#)
+#checkreturn
 
 #########################################################################
 # AVRDUDE
@@ -982,6 +989,7 @@ mv "manual" "$prefix/"
 
 #########################################################################
 # Mac OS X Package creation
+# MARK: Package creation
 #########################################################################
 
 echo "Starting package creation at $(date +"%Y-%m-%d %H:%M:%S")"
@@ -1046,6 +1054,7 @@ rm -rf "$pkgroot"
 
 #########################################################################
 # Disk Image
+# MARK: Create Disk Image
 #########################################################################
 
 echo "Starting disk image creation at $(date +"%Y-%m-%d %H:%M:%S")"
@@ -1116,6 +1125,7 @@ open $(dirname "$dmg")
 
 #########################################################################
 # Cleanup
+# MARK: Cleanup
 #########################################################################
 
 echo "=== cleaning up..."
