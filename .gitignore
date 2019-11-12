@@ -7,3 +7,5 @@ xcuserdata
 /compile
 /math
 /temporary-install
+*.log
+*.out
