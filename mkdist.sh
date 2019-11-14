@@ -389,7 +389,11 @@ buildPackage()
         if [ "$base" = avrdude ]; then
 			echo "Configuring AVRDUDE with libusb support"
 			echo $rootdir/configure --prefix="$prefix" $configureArgs "$@"
-			$rootdir/configure --prefix="$prefix" $configureArgs CFLAGS="-I$prefix/include/libusb-1.0" LDFLAGS="-L$prefix/lib" LIBS="-lobjc -framework IOKit -framework CoreFoundation" || exit 1
+			$rootdir/configure --prefix="$prefix" $configureArgs CFLAGS="-I$prefix/include/libusb-1.0 -I$prefix/include" LDFLAGS="-L$prefix/lib" LIBS="-lusb-1.0 -lobjc -framework IOKit -framework CoreFoundation" || exit 1
+		elif [ "$base" = libusb-compat ]; then
+			echo "Configuring libusb-compat"
+			echo $rootdir/configure --prefix="$prefix" $configureArgs PKG_CONFIG_PATH=$prefix/lib/pkgconfig "$@"
+			$rootdir/configure --prefix="$prefix" $configureArgs PKG_CONFIG_PATH=$prefix/lib/pkgconfig "$@" || exit 1
 		else
 			echo $rootdir/configure --prefix="$prefix" $configureArgs "$@"
 			$rootdir/configure --prefix="$prefix" $configureArgs "$@" || exit 1
@@ -575,7 +579,7 @@ rm -f "$installdir/lib/"*.dylib # ensure we have no shared libs
 #	export LIBUSB_1_0_CFLAGS="-I$prefix/include/libusb-1.0"
 #	export LIBUSB_1_0_LIBS="-lusb"
 	
-#	buildPackage libusb-compat-0.1 "$prefix/lib/libusb.a" --disable-shared
+	buildPackage libusb-compat-0.1 "$prefix/lib/libusb.a" --disable-shared
 	
 	rm -f "$prefix/lib"/libusb*.dylib
 	
