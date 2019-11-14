@@ -23,11 +23,11 @@ BUILDING CROSSPACK-AVR
 
 After installing Xcode, simply run
 
-    ./mkdist.sh
+    sudo ./mkdist.sh
 
 or
 
-    ./mkdist.sh debug
+    sudo ./mkdist.sh debug
 
 in the root directory of the project. You may want to edit some options in
 the script before running it, e.g. the version of CrossPack-AVR or versions
@@ -39,5 +39,5 @@ The resulting disk image can be found in /tmp.
 The build procedure preserves all downloaded packages. If you want to remove
 them in order to save disk space, run
 
-    ./mkclean.sh
+    sudo ./mkclean.sh
 
