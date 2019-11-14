@@ -8,10 +8,6 @@
 
 /* Begin PBXFileReference section */
 		4066DB6314EAA6220051D0F4 /* mkdist.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = mkdist.sh; sourceTree = "<group>"; };
-		4066DB6714EBD0BC0051D0F4 /* 010-fix-64-bit.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "010-fix-64-bit.patch"; sourceTree = "<group>"; };
-		4066DB6914EBEE560051D0F4 /* 20-gcc-binary-constants.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "20-gcc-binary-constants.patch"; sourceTree = "<group>"; };
-		4066DB6A14EBEE560051D0F4 /* 21-gcc-avr-misspelled-sig-1.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "21-gcc-avr-misspelled-sig-1.patch"; sourceTree = "<group>"; };
-		4066DB6B14EBEE560051D0F4 /* 60-new-devices.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "60-new-devices.patch"; sourceTree = "<group>"; };
 		4066DB7014EC5E8C0051D0F4 /* Readme.rtf */ = {isa = PBXFileReference; lastKnownFileType = text.rtf; path = Readme.rtf; sourceTree = "<group>"; };
 		4066DB7B14EC5E8C0051D0F4 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
 		4066DB7C14EC5E8C0051D0F4 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
@@ -35,8 +31,6 @@
 		406D947716665618004D70FD /* License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = License.txt; sourceTree = "<group>"; };
 		406D947916665641004D70FD /* postinstall */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = postinstall; sourceTree = "<group>"; };
 		406D947A16665653004D70FD /* background.jp2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = background.jp2; sourceTree = "<group>"; };
-		40D919CE1846922B00A9661C /* 010-iotn2313a-header.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "010-iotn2313a-header.patch"; sourceTree = "<group>"; };
-		40D919CF1846922B00A9661C /* 010-iotn4313-header.patch */ = {isa = PBXFileReference; lastKnownFileType = text; path = "010-iotn4313-header.patch"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -50,36 +44,7 @@
 				4066DB8414EC81B00051D0F4 /* manual-source */,
 				4066DB6C14EC5E8C0051D0F4 /* package-info */,
 				4066DB7814EC5E8C0051D0F4 /* templates */,
-				4066DB6514EBD0BC0051D0F4 /* patches-local */,
 			);
-			sourceTree = "<group>";
-		};
-		4066DB6514EBD0BC0051D0F4 /* patches-local */ = {
-			isa = PBXGroup;
-			children = (
-				40CFCFBC16C9A6B200C292D0 /* avr-libc-1.8.0 */,
-				4066DB6814EBEE560051D0F4 /* gcc-3.4.6 */,
-				4066DB6614EBD0BC0051D0F4 /* libusb-0.1.12 */,
-			);
-			path = "patches-local";
-			sourceTree = "<group>";
-		};
-		4066DB6614EBD0BC0051D0F4 /* libusb-0.1.12 */ = {
-			isa = PBXGroup;
-			children = (
-				4066DB6714EBD0BC0051D0F4 /* 010-fix-64-bit.patch */,
-			);
-			path = "libusb-0.1.12";
-			sourceTree = "<group>";
-		};
-		4066DB6814EBEE560051D0F4 /* gcc-3.4.6 */ = {
-			isa = PBXGroup;
-			children = (
-				4066DB6914EBEE560051D0F4 /* 20-gcc-binary-constants.patch */,
-				4066DB6A14EBEE560051D0F4 /* 21-gcc-avr-misspelled-sig-1.patch */,
-				4066DB6B14EBEE560051D0F4 /* 60-new-devices.patch */,
-			);
-			path = "gcc-3.4.6";
 			sourceTree = "<group>";
 		};
 		4066DB6C14EC5E8C0051D0F4 /* package-info */ = {
@@ -176,15 +141,6 @@
 				406D947916665641004D70FD /* postinstall */,
 			);
 			path = scripts;
-			sourceTree = "<group>";
-		};
-		40CFCFBC16C9A6B200C292D0 /* avr-libc-1.8.0 */ = {
-			isa = PBXGroup;
-			children = (
-				40D919CE1846922B00A9661C /* 010-iotn2313a-header.patch */,
-				40D919CF1846922B00A9661C /* 010-iotn4313-header.patch */,
-			);
-			path = "avr-libc-1.8.0";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

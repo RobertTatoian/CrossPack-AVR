@@ -80,7 +80,7 @@ xcodepath="$(xcode-select -print-path)"
 sysroot="$xcodepath/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
 # Do not include original PATH in our PATH to ensure that third party stuff is not found
-PATH="$prefix/bin:$xcodepath/usr/bin:$xcodepath/Toolchains/XcodeDefault.xctoolchain/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"
+PATH="$prefix:$prefix/bin:$xcodepath/usr/bin:$xcodepath/Toolchains/XcodeDefault.xctoolchain/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"
 export PATH
 
 # Commonly used flags when building various tools.
@@ -101,6 +101,8 @@ buildCFLAGS="$commonCFLAGS -arch x86_64 -fno-stack-protector"  # used for tool c
 # there is no obvious overflow, this is maybe a bug in clang's stack protector.
 # In any case, we are not responsible for debugging either of the two compilers,
 # so we simply disable the check.
+
+
 
 ###############################################################################
 # Check prerequisites first
@@ -322,92 +324,6 @@ unpackPackage() # <package-name>
 }
 
 ###############################################
-#Function Name: mergeAVRHeaders
-#Arguments: None
-#
-#Description:
-#MARK: mergeAVRHeaders
-###############################################
-mergeAVRHeaders()
-{
-    for i in "../avr8-headers"/io?*.h; do
-        # iotn4313.h is broken in atmel's header package AND in avr-libc-1.8.0. Our
-        # build mechanism allows to apply a patch to avr-libc-1.8.0 (since it has the
-        # standard configure/make procedure), but not to Atmel's headers. We therefore
-        # patch avr-libc and give it precedence over Atmel's headers for iotn4313.h.
-        # In all other cases Atmel's headers have precedence.
-        # The same is true for the 2313a.
-        if [ "$(basename "$i")" != iotn4313.h -a "$(basename "$i")" != iotn2313a.h ]; then
-            cp -f "$i" include/avr/
-        fi
-    done
-    if [ -f "../avr8-headers/io.h" ]; then
-        # We must merge the conditional includes of both versions of io.h since we
-        # want to build a superset:
-        awk 'BEGIN {
-                line = 0;
-                insertAt = 0;
-                recordLines = 1;
-            }
-
-            {
-                if (file != FILENAME) {     # file changed
-                    if (file != "") {
-                        recordLines = 0;    # not first file
-                    }
-                    file = FILENAME;
-                }
-                if (def != "" && match($0, "^#[ \t]*include")) {
-                    includes[def] = $0;
-                } else if (match($0, "^#[a-zA-Z]+[ \t]+[(]?defined")) {
-                    if (insertAt == 0) {
-                        insertAt = line;
-                    }
-                    def = $3;
-                    gsub("[^a-zA-Z0-9_]", "", def);
-                } else {
-                    def = "";
-                    if (recordLines) {
-                        lines[line++] = $0;
-                    }
-                }
-            }
-
-            END {
-                for (i = 0; i < line; i++) {
-                    if (i == insertAt) {
-                        prefix = "#if";
-                        for (def in includes) {
-                            printf("%s defined (%s)\n%s\n", prefix, def, includes[def]);
-                            prefix = "#elif";
-                        }
-                    }
-                    print lines[i];
-                }
-            }
-        ' "../avr8-headers/io.h" include/avr/io.h > include/avr/io.h.new
-        mv -f include/avr/io.h.new include/avr/io.h
-    fi
-}
-
-###############################################
-#Function Name: postConfigurePatches
-#Arguments: None
-#
-#Description:
-#MARK: postConfigurePatches
-###############################################
-postConfigurePatches()
-{
-    # Patch config.h so that we do not use strndup(), even if it is available.
-    # Strndup() is not available on 10.6 and we must not use it in order to
-    # preserve 10.6 compatibility.
-    if [ -f config.h ]; then
-        sed -ibak -e 's/#define.*HAVE_STRNDUP[^0-9A-Za-z].*$/#undef HAVE_STRNDUP/g' config.h
-    fi
-}
-
-###############################################
 #Function Name: buildPackage
 #Arguments: <package-name> <known-product> <additional-config-args...>
 #
@@ -435,24 +351,6 @@ buildPackage()
     applyPatches "$name"
     (
         cd "compile/$name"
-        
-#        if [ "$base" = avr-binutils ]; then
-#            # we remove version check because we can't guarantee a particular version
-#            sed -ibak 's/  \[m4_fatal(\[Please use exactly Autoconf \]/  \[m4_errprintn(\[Please use exactly Autoconf \]/g' ./config/override.m4
-#            (cd ld; autoreconf)
-#        fi
-        
-#        if [ "$base" = avr-libc ]; then
-#            mergeAVRHeaders
-#        fi
-        
-#        if [ -x ./bootstrap ]; then # avr-libc builds lib tree from this script
-#            ./bootstrap             # If the package has a bootstrap script, run it
-#            if [ "$base" = simulavr ]; then
-#                autoconf            # additional magic needed for simulavr
-#                ./bootstrap
-#            fi
-#        fi
         
         if [ "$name" = "libusb-compat-0.1" ]; then
 			echo $PATH
@@ -487,21 +385,22 @@ buildPackage()
         make distclean 2>/dev/null
         
         echo "cwd=`pwd`"
-        echo $rootdir/configure --prefix="$prefix" $configureArgs "$@"
-        $rootdir/configure --prefix="$prefix" $configureArgs "$@" || exit 1
-        
-        # I don't think this is necessary anymore since the min compat. version of macOS is 10.9
-#        postConfigurePatches
-#
-#        if [ -d $rootdir/bfd ]; then # if we build GNU binutils, ensure we update headers after patching
-#            make    # expect this make to fail, but at least we have configured everything
-#            (
-#                cd $rootdir/bfd
-#                rm -f bfd-in[23].h libbfd.h libcoff.h
-#                make headers
-#            )
-#        fi
-        
+        echo "$PATH"
+        if [ "$base" = avrdude ]; then
+			echo "Configuring AVRDUDE with libusb support"
+			echo $rootdir/configure --prefix="$prefix" $configureArgs "$@"
+			$rootdir/configure --prefix="$prefix" $configureArgs CFLAGS="-I$prefix/include/libusb-1.0 -I$prefix/include" LDFLAGS="-L$prefix/lib" LIBS="-lusb-1.0 -lobjc -framework IOKit -framework CoreFoundation" || exit 1
+		elif [ "$base" = libusb-compat ]; then
+			echo "Configuring libusb-compat"
+			echo $rootdir/configure --prefix="$prefix" $configureArgs PKG_CONFIG_PATH=$prefix/lib/pkgconfig "$@"
+			$rootdir/configure --prefix="$prefix" $configureArgs PKG_CONFIG_PATH=$prefix/lib/pkgconfig "$@" || exit 1
+		else
+			echo $rootdir/configure --prefix="$prefix" $configureArgs "$@"
+			$rootdir/configure --prefix="$prefix" $configureArgs "$@" || exit 1
+		fi
+		
+		
+		
         if ! make; then
 			echo "*═══════════════════════════════════════════════════════*"
 			echo "║Building $name failed at $(date +"%Y-%m-%d %H:%M:%S")"
@@ -552,33 +451,6 @@ copyPackage()
     mv "compile/$name/"* "$destination/"
     chmod -R a+rX "$destination"
 }
-
-# TODO: This probably doesn't need to be included since the minimum version is 10.9 now.
-#
-# The following function fixes the library path of a load command in a mach-o
-# executable. Yes, this is a hack!
-# We need to patch the path in order to preserve 10.6 compatibility when compiling
-# with 10.7 SDK: When we link to libreadline, we get libedit as an indirect
-# dependency of the binary (in our case: avrdude). Since libreadline links to an
-# explicit version of libedit and this version differs between 10.6 and 10.7, we
-# need to remove the version number.
-#fixLoadCommandInBinary() #<binary-path> <searchLibraryPath> <replacementLibraryPath>
-#{
-#    executable="$1"
-#    searchLib="$2"
-#    replaceLib="$3"
-#    echo "Fixing library $searchLib in $executable"
-#    # we need /bin/echo because sh's built-in echo does not support -n
-#    search=$(/bin/echo -n "$searchLib" | xxd -p | tr -d '\n')
-#    replace=$(/bin/echo -n "$replaceLib" | xxd -p | tr -d '\n')
-#    # now pad $replace to same length as search:
-#    delta=$((${#search} - ${#replace}))
-#    zero="00000000000000000000000000000000000000000000000000000000000000000000000"
-#    replace="$replace${zero:0:$delta}"
-#    cp "$executable" "$executable.orig"
-#    xxd -p "$executable.orig" | tr -d '\n' | sed -e "s/$search/$replace/" | xxd -p -r >"$executable"
-#    rm -f "$executable.orig"
-#}
 
 ###############################################################################
 # Main Code
@@ -665,7 +537,7 @@ fi
 
 # Rename libusb-compat
 if [ -f "$(pwd)/packages/master.zip" ]; then
-	mv "$(pwd)/packages/master.zip" "$(pwd)/packages/libusb-compat-0.1.zip"
+	cp "$(pwd)/packages/master.zip" "$(pwd)/packages/libusb-compat-0.1.zip"
 fi
 
 #########################################################################
@@ -694,21 +566,19 @@ buildPackage gmp-"$version_gmp"   "$installdir/lib/libgmp.a"  --prefix="$install
 buildPackage mpfr-"$version_mpfr" "$installdir/lib/libmpfr.a" --with-gmp="$installdir" --prefix="$installdir" --enable-shared=no
 buildPackage mpc-"$version_mpc"   "$installdir/lib/libmpc.a"  --with-gmp="$installdir" --with-mpfr="$installdir" --prefix="$installdir" --enable-shared=no
 
-#buildPackage ppl-"$version_ppl"   "$installdir/lib/libppl.a"  --with-gmp="$installdir" --prefix="$installdir" --enable-shared=no
-#buildPackage cloog-"$version_cloog"   "$installdir/lib/libcloog-isl.a"  --with-gmp-prefix="$installdir" --prefix="$installdir" --enable-shared=no
-
 rm -f "$installdir/lib/"*.dylib # ensure we have no shared libs
 
 #########################################################################
-# additional goodies
+# libusb needed for AVRDUDE
 # MARK: Build libusb
 #########################################################################
 (
 	buildCFLAGS="$commonCFLAGS -arch x86_64"
-	buildPackage libusb-"$version_libusb" "$prefix/lib/libusb-1.0.a" --disable-shared
 	
-	export LIBUSB_1_0_CFLAGS="-I$prefix/include/libusb-1.0"
-	export LIBUSB_1_0_LIBS="-lusb"
+	buildPackage libusb-"$version_libusb" "$prefix/lib/libusb-1.0.a" --disable-shared
+#	export LIBUSB_1_0_CFLAGS="-I$prefix/include/libusb-1.0"
+#	export LIBUSB_1_0_LIBS="-lusb"
+	
 	buildPackage libusb-compat-0.1 "$prefix/lib/libusb.a" --disable-shared
 	
 	rm -f "$prefix/lib"/libusb*.dylib
@@ -739,7 +609,9 @@ if [ ! -f "$prefix/bfd/lib/libbfd.a" ]; then
 fi
 
 if [ ! -f "$prefix/lib/libiberty.a" ]; then
-    mkdir "$prefix/lib"
+	if [ ! -d "$prefix/lib" ]; then
+		mkdir "$prefix/lib"
+    fi
     cp compile/binutils-"$version_binutils"/libiberty/libiberty.a "$prefix/lib/"
 fi
 
@@ -747,13 +619,12 @@ fi
 # gcc bootstrap
 # MARK: Bootstrap GCC
 #########################################################################
-buildPackage gcc-"$version_gcc" "$prefix/bin/avr-gcc" --target=avr --enable-languages=c --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
+buildPackage gcc-"$version_gcc" "$prefix/bin/avr-g++" --target=avr --enable-languages=c,c++ --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
 
 #########################################################################
 # avr-libc
 # MARK: Build AVR-LibC
 #########################################################################
-#unpackPackage "avr8-headers"
 buildPackage avr-libc-"$version_avrlibc" "$prefix/avr/lib/libc.a" --host=avr --enable-device-lib
 copyPackage avr-libc-user-manual-"$version_avrlibc" "$prefix/doc/avr-libc"
 copyPackage avr-libc-manpages-"$version_avrlibc" "$prefix/man"
@@ -762,7 +633,7 @@ copyPackage avr-libc-manpages-"$version_avrlibc" "$prefix/man"
 # avr-gcc full build
 # MARK: GCC with C & C++ Support
 #########################################################################
-buildPackage gcc-"$version_gcc" "$prefix/bin/avr-g++" --target=avr --enable-languages=c,c++ --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
+#buildPackage gcc-"$version_gcc" "$prefix/bin/avr-g++" --target=avr --enable-languages=c,c++ --disable-libssp --disable-libada --with-dwarf2 --disable-shared --with-avrlibc=yes --with-gmp="$installdir" --with-mpfr="$installdir" --with-mpc="$installdir"
 
 
 #########################################################################
@@ -774,14 +645,14 @@ buildPackage gdb-"$version_gdb" "$prefix/bin/avr-gdb" --target=avr --without-pyt
 #########################################################################
 # AVaRICE
 # MARK: Build AVaRICE
-#########################################################################
-(
-    binutils="$(pwd)/compile/binutils-$version_binutils"
-    buildCFLAGS="$buildCFLAGS $("$prefix/bin/libusb-config" --cflags) -I$binutils/bfd -I$binutils/include -O"
-    export LDFLAGS="$LDFLAGS $("$prefix/bin/libusb-config" --libs) -L$binutils/bfd -lz -L$binutils/libiberty -liberty"
-    buildPackage avarice-"$version_avarice" "$prefix/bin/avarice"
-)
-checkreturn
+##########################################################################
+#(
+#    binutils="$(pwd)/compile/binutils-$version_binutils"
+#    buildCFLAGS="$buildCFLAGS $("$prefix/bin/libusb-config" --cflags) -I$binutils/bfd -I$binutils/include -O"
+#    export LDFLAGS="$LDFLAGS $("$prefix/bin/libusb-config" --libs) -L$binutils/bfd -lz -L$binutils/libiberty -liberty"
+#    buildPackage avarice-"$version_avarice" "$prefix/bin/avarice"
+#)
+#checkreturn
 
 #########################################################################
 # SimulAVR
@@ -799,10 +670,8 @@ checkreturn
 # MARK: Build AVRDUDE
 #########################################################################
 (
-    buildCFLAGS="$buildCFLAGS $("$prefix/bin/libusb-config" --cflags)"
-    export LDFLAGS="$LDFLAGS $("$prefix/bin/libusb-config" --libs)"
     buildPackage avrdude-"$version_avrdude" "$prefix/bin/avrdude"
-#    fixLoadCommandInBinary "$prefix/bin/avrdude" /usr/lib/libedit.3.dylib /usr/lib/libedit.dylib
+    
     copyPackage avrdude-doc-"$version_avrdude" "$prefix/doc/avrdude"
     if [ ! -f "$prefix/doc/avrdude/index.html" ]; then
         ln -s avrdude.html "$prefix/doc/avrdude/index.html"
